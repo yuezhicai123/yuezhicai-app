@@ -10,6 +10,7 @@ import android.net.http.SslError
 import android.webkit.SslErrorHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -20,12 +21,36 @@ import androidx.compose.ui.viewinterop.AndroidView
 import cn.xiaizizi.ui.theme.DiscuzTheme
 
 class MainActivity : ComponentActivity() {
+    // 保存WebView引用
+    private var webView: WebView? = null
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // 使用更现代的方式处理返回键
+        val callback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView?.canGoBack() == true) {
+                    // 如果WebView可以返回，则返回上一页
+                    webView?.goBack()
+                } else {
+                    // 否则禁用此回调并执行默认的返回操作
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        }
+        
+        // 将回调添加到调度器
+        onBackPressedDispatcher.addCallback(this, callback)
+        
         setContent {
             DiscuzTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) {
-                    WebViewScreen(modifier = Modifier.padding(it))
+                    WebViewScreen(modifier = Modifier.padding(it)) { view ->
+                        webView = view
+                    }
                 }
             }
         }
@@ -33,12 +58,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun WebViewScreen(modifier: Modifier = Modifier) {
+fun WebViewScreen(modifier: Modifier = Modifier, onWebViewCreated: (WebView) -> Unit) {
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context: android.content.Context ->
                 val webView = WebView(context)
+                // 传递WebView引用给MainActivity
+                onWebViewCreated(webView)
                 
                 // 启用Cookie支持以确保QQ登录会话正常
                 val cookieManager = CookieManager.getInstance()
