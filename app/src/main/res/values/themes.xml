@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Discuz" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+        <!-- 不设置任何自定义颜色，完全使用系统默认 -->
+    </style>
+</resources>
