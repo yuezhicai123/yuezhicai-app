@@ -1,6 +1,9 @@
 package cn.xiaizizi
 
 import android.os.Bundle
+import android.os.Environment
+import android.app.AlertDialog
+import android.provider.Settings
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -199,6 +202,29 @@ class MainActivity : ComponentActivity() {
                 REQUEST_CODE_PERMISSIONS
             )
         }
+        
+        // Android 13+ 检查是否需要请求所有文件访问权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            checkAndRequestAllFilesAccessPermission()
+        }
+    }
+    
+    // 检查并请求所有文件访问权限（Android 13+）
+    private fun checkAndRequestAllFilesAccessPermission() {
+        if (!Environment.isExternalStorageManager()) {
+            // 未获得所有文件访问权限，显示对话框引导用户前往设置页面开启
+            AlertDialog.Builder(this)
+                .setTitle("需要文件访问权限")
+                .setMessage("为了能够访问所有类型的本地文件，应用需要获得\"所有文件访问权限\". 请在设置页面中开启此权限。")
+                .setPositiveButton("前往设置") {
+                    _, _ ->
+                    // 跳转到应用设置页面
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    startActivity(intent)
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
     }
 }
 
@@ -276,9 +302,9 @@ private fun configureWebView(webView: WebView, swipeRefreshLayout: SwipeRefreshL
             // 检查是否支持多文件选择
             val isMultipleSelection = fileChooserParams.mode == FileChooserParams.MODE_OPEN_MULTIPLE
             
-            // 创建文件选择Intent
+            // 创建文件选择Intent，支持所有文件类型
             val intent = Intent(Intent.ACTION_GET_CONTENT)
-            intent.type = "image/*"
+            intent.type = "*/*"
             intent.addCategory(Intent.CATEGORY_OPENABLE)
             
             if (isMultipleSelection) {
@@ -287,7 +313,7 @@ private fun configureWebView(webView: WebView, swipeRefreshLayout: SwipeRefreshL
             
             // 启动文件选择器
             (context as MainActivity).startActivityForResult(
-                Intent.createChooser(intent, "选择图片"),
+                Intent.createChooser(intent, "选择文件"),
                 REQUEST_CODE_FILE_PICKER
             )
             
