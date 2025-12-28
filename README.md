@@ -6,7 +6,6 @@
 
 - 📱 **网站嵌入**：使用WebView组件完整嵌入xiaizizi.cn网站
 - 🔄 **自适应布局**：适配各种手机屏幕尺寸
-- 🔒 **QQ登录支持**：集成QQ第三方登录功能
 - 🎨 **自定义图标**：使用自定义应用图标替代默认Android图标
 - 🔧 **应用签名**：已配置发布签名，可直接构建发布APK
 - 📋 **权限管理**：仅请求必要的网络权限
@@ -120,10 +119,9 @@ settings.apply {
     userAgentString = "Mozilla/5.0 (Linux; Android ${android.os.Build.VERSION.RELEASE}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${android.os.Build.VERSION.RELEASE} Mobile Safari/537.36"
 }
 
-// CookieManager配置（用于QQ登录）
+// CookieManager配置
 val cookieManager = CookieManager.getInstance()
 cookieManager.setAcceptCookie(true)
-cookieManager.setAcceptThirdPartyCookies(webView, true)
 ```
 
 ### 应用签名配置
@@ -166,13 +164,11 @@ buildTypes {
 
 1. **SSL错误处理**：当前配置忽略了SSL错误，仅用于测试环境。在生产环境中应移除该配置。
 
-2. **QQ登录**：确保已在QQ开放平台注册应用并配置正确的回调URL。
+2. **网络权限**：应用需要`INTERNET`权限才能加载网页内容。
 
-3. **网络权限**：应用需要`INTERNET`权限才能加载网页内容。
+3. **自定义协议**：WebView会忽略非HTTP/HTTPS协议的链接，如`bytedance://`等。
 
-4. **自定义协议**：WebView会忽略非HTTP/HTTPS协议的链接，如`bytedance://`等。
-
-5. **会话管理**：使用CookieManager维护用户登录状态。
+4. **会话管理**：使用CookieManager维护用户登录状态。
 
 ## 许可证
 
@@ -193,6 +189,5 @@ buildTypes {
 
 - 首次发布
 - 完整集成xiaizizi.cn网站
-- 实现QQ登录功能
 - 适配各种屏幕尺寸
 - 配置应用签名

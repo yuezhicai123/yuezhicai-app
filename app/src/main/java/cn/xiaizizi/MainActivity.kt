@@ -67,25 +67,55 @@ fun WebViewScreen(modifier: Modifier = Modifier, onWebViewCreated: (WebView) -> 
                 // 传递WebView引用给MainActivity
                 onWebViewCreated(webView)
                 
-                // 启用Cookie支持以确保QQ登录会话正常
+                // 启用基本Cookie支持
                 val cookieManager = CookieManager.getInstance()
                 cookieManager.setAcceptCookie(true)
-                cookieManager.setAcceptThirdPartyCookies(webView, true)
                 
                 webView.apply {
                     webViewClient = object : WebViewClient() {
+                        private val visitedUrls = mutableSetOf<String>()
+                        private val MAX_REDIRECTS = 5 // 恢复正常的重定向限制
+                        private var redirectCount = 0
+                        
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                             val url = request.url.toString()
                             
+                            // 防止循环重定向
+                            redirectCount++
+                            if (redirectCount > MAX_REDIRECTS) {
+                                // 显示错误信息或处理
+                                view.loadUrl("about:blank")
+                                view.loadUrl("https://xiaizizi.cn/") // 重置到首页
+                                return true // 停止加载以防止无限循环
+                            }
+                            
+                            // 如果URL已经访问过，可能是循环
+                            if (visitedUrls.contains(url)) {
+                                return true
+                            }
+                            
+                            // 添加到已访问URL集合（限制集合大小，防止内存问题）
+                            if (visitedUrls.size > 50) {
+                                visitedUrls.clear()
+                            }
+                            visitedUrls.add(url)
+                            
                             // 处理所有HTTP和HTTPS链接，让WebView继续加载
-                            // 包括QQ登录页面和回调URL
                             if (url.startsWith("http://") || url.startsWith("https://")) {
-                                // 让WebView自己处理所有网络请求，包括QQ登录回调
                                 return false
                             } else {
-                                // 处理自定义协议（如qqlogin://）
-                                // 如果有需要，可以在这里添加特殊处理逻辑
+                                // 处理自定义协议
                                 return true
+                            }
+                        }
+                        
+                        override fun onPageFinished(view: WebView, url: String?) {
+                            super.onPageFinished(view, url)
+                            // 页面加载完成后重置重定向计数
+                            redirectCount = 0
+                            // 对于主要页面，清空已访问URL集合以允许新的导航
+                            if (url != null && (url == "https://xiaizizi.cn/" || url.startsWith("https://xiaizizi.cn/thread-") || url.startsWith("https://xiaizizi.cn/forum-"))) {
+                                visitedUrls.clear()
                             }
                         }
                         
@@ -95,7 +125,7 @@ fun WebViewScreen(modifier: Modifier = Modifier, onWebViewCreated: (WebView) -> 
                         }
                     }
                     
-                    // 优化WebView设置以适配不同屏幕和支持QQ登录
+                    // WebView基本设置
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
@@ -104,23 +134,9 @@ fun WebViewScreen(modifier: Modifier = Modifier, onWebViewCreated: (WebView) -> 
                         builtInZoomControls = true
                         displayZoomControls = false
                         setSupportZoom(true)
-                        // 启用混合内容（HTTP和HTTPS）
-                        mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                         
-                        // 启用第三方Cookie支持（QQ登录需要）
-                        allowContentAccess = true
-                        allowFileAccess = true
-                        allowFileAccessFromFileURLs = false
-                        allowUniversalAccessFromFileURLs = false
-                        
-                        // 设置UserAgent以模拟真实浏览器
+                        // 设置UserAgent
                         userAgentString = "Mozilla/5.0 (Linux; Android ${android.os.Build.VERSION.RELEASE}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${android.os.Build.VERSION.RELEASE} Mobile Safari/537.36"
-                        
-                        // 启用表单自动填充
-                        saveFormData = true
-                        
-                        // 提高渲染性能
-                        setRenderPriority(WebSettings.RenderPriority.HIGH)
                     }
                     
                     // 加载网站
