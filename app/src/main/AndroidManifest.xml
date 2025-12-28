@@ -5,10 +5,10 @@
     <!-- 必要的权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
     
-    <!-- Android 13+ 以下版本的存储权限 -->
+    <!-- Android 13+ 以下版本的存储和相机权限 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.CAMERA" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.CAMERA" />
     
     <!-- Android 13+ 媒体权限 -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -39,6 +39,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <!-- FileProvider 配置，用于相机拍摄图片 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="cn.xiaizizi.fileprovider"
+            android:grantUriPermissions="true"
+            android:exported="false">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

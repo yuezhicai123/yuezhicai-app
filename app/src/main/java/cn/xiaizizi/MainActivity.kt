@@ -35,8 +35,12 @@ import android.widget.Toast
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import android.os.Build
 import java.io.File
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.*
 import android.content.Context
 import android.graphics.Bitmap
 import android.provider.DocumentsContract
@@ -55,13 +59,13 @@ private const val REQUEST_CODE_CAMERA = 1003
 
 // 需要的权限列表
 private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-    // Android 13+ 使用媒体权限
+    // Android 13+ 使用媒体权限和相机权限
     arrayOf(
         android.Manifest.permission.READ_MEDIA_IMAGES,
         android.Manifest.permission.CAMERA
     )
 } else {
-    // Android 12- 使用存储权限
+    // Android 12- 使用存储权限和相机权限
     arrayOf(
         android.Manifest.permission.READ_EXTERNAL_STORAGE,
         android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
@@ -77,8 +81,10 @@ class MainActivity : ComponentActivity() {
     public var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     
     // 保存临时图片文件Uri
-    private var cameraImageUri: Uri? = null
+    public var cameraImageUri: Uri? = null
     
+    // 保存需要请求的额外权限列表
+    private val additionalPermissions = mutableListOf<String>()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -146,32 +152,47 @@ class MainActivity : ComponentActivity() {
         
         when (requestCode) {
             REQUEST_CODE_FILE_PICKER -> {
-                if (resultCode == RESULT_OK && data != null) {
+                if (resultCode == RESULT_OK) {
                     val result = when {
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP -> {
-                            val resultArray: Array<Uri>? = data.clipData?.let { clipData ->
-                                val uris = arrayOfNulls<Uri>(clipData.itemCount)
-                                for (i in 0 until clipData.itemCount) {
-                                    uris[i] = clipData.getItemAt(i).uri
+                        // 如果data不为空，可能是文件选择或相机拍摄（取决于设备）
+                        data != null -> {
+                            when (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                true -> {
+                                    val resultArray: Array<Uri>? = data.clipData?.let { clipData ->
+                                        val uris = arrayOfNulls<Uri>(clipData.itemCount)
+                                        for (i in 0 until clipData.itemCount) {
+                                            uris[i] = clipData.getItemAt(i).uri
+                                        }
+                                        uris.filterNotNull().toTypedArray()
+                                    } ?: data.data?.let { arrayOf(it) }
+                                    resultArray
                                 }
-                                uris.filterNotNull().toTypedArray()
-                            } ?: data.data?.let { arrayOf(it) }
-                            resultArray
+                                else -> {
+                                    data.data?.let { arrayOf(it) }
+                                }
+                            }
                         }
+                        // 如果data为空但resultCode为OK，可能是相机拍摄的结果
                         else -> {
-                            data.data?.let { arrayOf(it) }
+                            cameraImageUri?.let { arrayOf(it) }
                         }
                     }
                     
                     result?.let { uris ->
                         fileChooserCallback?.onReceiveValue(uris)
+                    } ?: run {
+                        fileChooserCallback?.onReceiveValue(null)
                     }
                 } else {
                     fileChooserCallback?.onReceiveValue(null)
                 }
                 fileChooserCallback = null
+                // 清除临时相机Uri，避免内存泄漏
+                cameraImageUri = null
             }
             REQUEST_CODE_CAMERA -> {
+                // 这个分支可能不再需要，因为相机功能现在通过REQUEST_CODE_FILE_PICKER处理
+                // 保留以兼容可能的旧代码
                 if (resultCode == RESULT_OK) {
                     cameraImageUri?.let { uri ->
                         fileChooserCallback?.onReceiveValue(arrayOf(uri))
@@ -180,6 +201,7 @@ class MainActivity : ComponentActivity() {
                     fileChooserCallback?.onReceiveValue(null)
                 }
                 fileChooserCallback = null
+                cameraImageUri = null
             }
         }
     }
@@ -191,14 +213,22 @@ class MainActivity : ComponentActivity() {
             return
         }
         
-        val permissionsToRequest = REQUIRED_PERMISSIONS.filter { permission ->
+        val permissionsToRequest = mutableListOf<String>()
+        
+        // 添加必要的权限
+        permissionsToRequest.addAll(REQUIRED_PERMISSIONS.filter { permission ->
             ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
-        }.toTypedArray()
+        })
+        
+        // 添加额外的权限
+        permissionsToRequest.addAll(additionalPermissions.filter { permission ->
+            ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
+        })
         
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(
                 this,
-                permissionsToRequest,
+                permissionsToRequest.toTypedArray(),
                 REQUEST_CODE_PERMISSIONS
             )
         }
@@ -216,13 +246,15 @@ class MainActivity : ComponentActivity() {
             AlertDialog.Builder(this)
                 .setTitle("需要文件访问权限")
                 .setMessage("为了能够访问所有类型的本地文件，应用需要获得\"所有文件访问权限\". 请在设置页面中开启此权限。")
-                .setPositiveButton("前往设置") {
-                    _, _ ->
+                .setPositiveButton("前往设置") { _, _ ->
                     // 跳转到应用设置页面
                     val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
                     startActivity(intent)
                 }
-                .setNegativeButton("取消", null)
+                .setNegativeButton("取消") { _, _ ->
+                    // 显示提示信息，告知用户某些功能可能无法正常使用
+                    Toast.makeText(this, "未授予所有文件访问权限，部分功能可能无法正常使用", Toast.LENGTH_LONG).show()
+                }
                 .show()
         }
     }
@@ -302,20 +334,60 @@ private fun configureWebView(webView: WebView, swipeRefreshLayout: SwipeRefreshL
             // 检查是否支持多文件选择
             val isMultipleSelection = fileChooserParams.mode == FileChooserParams.MODE_OPEN_MULTIPLE
             
-            // 创建文件选择Intent，支持所有文件类型
-            val intent = Intent(Intent.ACTION_GET_CONTENT)
-            intent.type = "*/*"
-            intent.addCategory(Intent.CATEGORY_OPENABLE)
+            // 创建Intent列表，包含文件选择和相机拍摄
+            val intents = mutableListOf<Intent>()
+            
+            // 添加文件选择Intent，支持所有文件类型
+            val fileIntent = Intent(Intent.ACTION_GET_CONTENT)
+            fileIntent.type = "*/*"
+            fileIntent.addCategory(Intent.CATEGORY_OPENABLE)
             
             if (isMultipleSelection) {
-                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                fileIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             }
             
-            // 启动文件选择器
-            (context as MainActivity).startActivityForResult(
-                Intent.createChooser(intent, "选择文件"),
-                REQUEST_CODE_FILE_PICKER
-            )
+            intents.add(fileIntent)
+            
+            // 检查相机权限并添加相机Intent
+            if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                if (cameraIntent.resolveActivity(context.packageManager) != null) {
+                    // 创建临时文件保存相机拍摄的图片
+                    val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+                    try {
+                        val tempFile = File.createTempFile(
+                            "temp_image_",
+                            ".jpg",
+                            storageDir
+                        )
+                        (context as MainActivity).cameraImageUri = FileProvider.getUriForFile(
+                            context,
+                            context.packageName + ".fileprovider",
+                            tempFile
+                        )
+                        cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, (context as MainActivity).cameraImageUri)
+                        cameraIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        intents.add(cameraIntent)
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+            
+            // 启动文件选择器（如果有相机选项，会显示选择对话框）
+            if (intents.size > 1) {
+                (context as MainActivity).startActivityForResult(
+                    Intent.createChooser(intents.removeAt(0), "选择文件或拍照").apply {
+                        putExtra(Intent.EXTRA_INITIAL_INTENTS, intents.toTypedArray())
+                    },
+                    REQUEST_CODE_FILE_PICKER
+                )
+            } else {
+                (context as MainActivity).startActivityForResult(
+                    Intent.createChooser(intents[0], "选择文件"),
+                    REQUEST_CODE_FILE_PICKER
+                )
+            }
             
             return true
         }
