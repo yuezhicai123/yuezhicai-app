@@ -51,10 +51,20 @@ private const val REQUEST_CODE_FILE_PICKER = 1002
 private const val REQUEST_CODE_CAMERA = 1003
 
 // 需要的权限列表
-private val REQUIRED_PERMISSIONS = arrayOf(
-    android.Manifest.permission.READ_EXTERNAL_STORAGE,
-    android.Manifest.permission.CAMERA
-)
+private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    // Android 13+ 使用媒体权限
+    arrayOf(
+        android.Manifest.permission.READ_MEDIA_IMAGES,
+        android.Manifest.permission.CAMERA
+    )
+} else {
+    // Android 12- 使用存储权限
+    arrayOf(
+        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        android.Manifest.permission.CAMERA
+    )
+}
 
 class MainActivity : ComponentActivity() {
     // 保存WebView引用
