@@ -1,6 +1,8 @@
 package cn.xiaizizi
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -14,11 +16,16 @@ import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import cn.xiaizizi.ui.theme.DiscuzTheme
+import androidx.compose.material3.Scaffold
 
 class MainActivity : ComponentActivity() {
     // 保存WebView引用
@@ -59,12 +66,19 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WebViewScreen(modifier: Modifier = Modifier, onWebViewCreated: (WebView) -> Unit) {
+    // 当前WebView引用
+    var currentWebView by remember { mutableStateOf<WebView?>(null) }
+    
     Box(modifier = modifier.fillMaxSize()) {
+        // 下拉刷新组件 - 使用原生的SwipeRefreshLayout
         AndroidView(
             modifier = Modifier.fillMaxSize(),
-            factory = { context: android.content.Context ->
+            factory = { context ->
+                val swipeRefreshLayout = SwipeRefreshLayout(context)
+                
+                // 创建WebView
                 val webView = WebView(context)
-                // 传递WebView引用给MainActivity
+                currentWebView = webView
                 onWebViewCreated(webView)
                 
                 // 启用基本Cookie支持
@@ -117,6 +131,8 @@ fun WebViewScreen(modifier: Modifier = Modifier, onWebViewCreated: (WebView) -> 
                             if (url != null && (url == "https://xiaizizi.cn/" || url.startsWith("https://xiaizizi.cn/thread-") || url.startsWith("https://xiaizizi.cn/forum-"))) {
                                 visitedUrls.clear()
                             }
+                            // 页面加载完成后停止刷新
+                            swipeRefreshLayout.isRefreshing = false
                         }
                         
                         override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
@@ -145,6 +161,31 @@ fun WebViewScreen(modifier: Modifier = Modifier, onWebViewCreated: (WebView) -> 
                     // 设置WebView背景透明
                     setBackgroundColor(0x00000000)
                 }
+                
+                // 设置刷新监听器
+                swipeRefreshLayout.setOnRefreshListener {
+                    // 开始刷新
+                    swipeRefreshLayout.isRefreshing = true
+                    
+                    // 使用主线程Handler
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        // 获取当前WebView的URL
+                        val currentUrl = webView?.url
+                        // 如果有URL，重新加载
+                        if (currentUrl != null) {
+                            webView?.loadUrl(currentUrl)
+                        } else {
+                            // 如果没有URL，加载默认页面
+                            webView?.loadUrl("https://xiaizizi.cn/")
+                        }
+                    }, 500) // 较短的延迟，因为实际的加载会在WebView内部进行
+                }
+                
+                // 将WebView添加到SwipeRefreshLayout
+                swipeRefreshLayout.addView(webView)
+                
+                // 返回SwipeRefreshLayout
+                swipeRefreshLayout
             }
         )
     }
