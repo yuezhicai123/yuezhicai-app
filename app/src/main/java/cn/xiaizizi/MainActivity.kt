@@ -59,10 +59,11 @@ private const val REQUEST_CODE_CAMERA = 1003
 
 // 需要的权限列表
 private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-    // Android 13+ 使用媒体权限和相机权限
+    // Android 13+ 使用媒体权限、相机权限和通知权限
     arrayOf(
         android.Manifest.permission.READ_MEDIA_IMAGES,
-        android.Manifest.permission.CAMERA
+        android.Manifest.permission.CAMERA,
+        android.Manifest.permission.POST_NOTIFICATIONS
     )
 } else {
     // Android 12- 使用存储权限和相机权限
@@ -91,6 +92,9 @@ class MainActivity : ComponentActivity() {
         // 请求必要的权限
         requestPermissionsIfNeeded()
         
+        // 初始化通知渠道
+        initializeNotificationChannels()
+        
         // 使用更现代的方式处理返回键
         val callback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -112,12 +116,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             DiscuzTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) {
-                    WebViewScreen(modifier = Modifier.padding(it)) {
-                        webView = it
-                    }
+                    WebViewScreen(modifier = Modifier.padding(it)) { webView = it }
                 }
             }
         }
+    }
+
+    // 初始化通知渠道
+    private fun initializeNotificationChannels() {
+        val notificationService = NotificationService()
+        notificationService.createNotificationChannel(this)
     }
 
     // 优化内存管理：在Activity销毁时释放WebView资源

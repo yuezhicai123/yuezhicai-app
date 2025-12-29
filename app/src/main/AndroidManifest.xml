@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 通知权限 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 13+ 之前版本的通知权限不需要显式声明 -->
+    
     <!-- 必要的权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
     
@@ -50,6 +54,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        
+        <!-- 通知渠道服务 -->
+        <service
+            android:name=".NotificationService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- 用于接收通知的广播接收器 -->
+        <receiver
+            android:name=".NotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="cn.xiaizizi.NOTIFICATION_ACTION" />
+            </intent-filter>
+        </receiver>
     </application>
-
 </manifest>

@@ -15,18 +15,18 @@ android {
         minSdk = 30
         targetSdk = 35
         maxSdk = 35
-        versionCode = 6
-        versionName = "1.1.5"
+        versionCode = 7
+        versionName = "1.1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
         create("release") {
-            storeFile = file("../keystores/app.keystore") // 密钥库文件路径
-            storePassword = "android" // 密钥库密码
-            keyAlias = "app_release" // 密钥别名
-            keyPassword = "android" // 密钥密码
+            storeFile = file("../yuezhicai.jks") // 密钥库文件路径
+            storePassword = "chen0128" // 密钥库密码
+            keyAlias = "yuezhicai_app" // 密钥别名
+            keyPassword = "chen0128" // 密钥密码
         }
     }
 
